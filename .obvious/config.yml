@@ -1,0 +1,10 @@
+# .obvious/config.yml — repo policy for Obvious agents.
+# Auto-detected from GitHub repo settings on 2026-09-03.
+
+defaultBranch: main
+
+# GitHub allows merge commits, squash, and rebase on this repo;
+# the effective default merge method is a merge commit.
+mergeMethod: merge
+allowedMergeMethods: [merge, squash, rebase]
+deleteBranchOnMerge: false
