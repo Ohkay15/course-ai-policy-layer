@@ -41,6 +41,31 @@ export const CANVAS_CONFIG = {
   ],
 };
 
+/**
+ * Config preflight: a pure read of the environment that reports exactly which
+ * required keys are absent — misconfiguration is named, never silently ''.
+ * Covers exactly the CANVAS_LTI_* keys CANVAS_CONFIG reads.
+ *
+ * @returns {{ok: boolean, missing: string[]}}
+ */
+export function validateConfig() {
+  const missing = [
+    'CANVAS_LTI_ISSUER',
+    'CANVAS_LTI_CLIENT_ID',
+    'CANVAS_LTI_DEPLOYMENT_ID',
+    'CANVAS_LTI_KEYSET_URL',
+    'CANVAS_LTI_TOKEN_URL',
+  ].filter((k) => !process_env(k));
+  return missing.length ? { ok: false, missing } : { ok: true, missing: [] };
+}
+
+// Fail at load, not at first request: a LIVE module with incomplete config
+// should never survive import.
+if (LIVE) {
+  const v = validateConfig();
+  if (!v.ok) throw new Error(`Canvas LIVE misconfigured — missing env: ${v.missing.join(', ')}`);
+}
+
 // Small helper so this file reads cleanly in a browser demo where there is no
 // process.env. In a Node/server deployment, swap for real process.env access.
 function process_env(key) {
@@ -58,6 +83,8 @@ function process_env(key) {
  */
 export async function getAssignmentContext(launchToken) {
   if (LIVE) {
+    const v = validateConfig();
+    if (!v.ok) throw new Error(`Canvas LIVE misconfigured — missing env: ${v.missing.join(', ')}`);
     // return await ltiClient.readLineItem(launchToken, CANVAS_CONFIG);
     throw new Error('LIVE Canvas client not configured. Register the LTI key with DoIT and set CANVAS_CONFIG.');
   }
@@ -78,6 +105,8 @@ export async function getAssignmentContext(launchToken) {
  */
 export async function postInteractionRecord(record) {
   if (LIVE) {
+    const v = validateConfig();
+    if (!v.ok) throw new Error(`Canvas LIVE misconfigured — missing env: ${v.missing.join(', ')}`);
     // return await ltiClient.postResult(record, CANVAS_CONFIG);
     throw new Error('LIVE Canvas client not configured.');
   }

@@ -27,6 +27,24 @@ export const ASSISTANT_CONFIG = {
   boundedByPolicy: true,
 };
 
+/**
+ * Config preflight: a pure read of the environment that reports exactly which
+ * required keys are absent — misconfiguration is named, never silently ''.
+ *
+ * @returns {{ok: boolean, missing: string[]}}
+ */
+export function validateConfig() {
+  const missing = ['ASSISTANT_ENDPOINT', 'ASSISTANT_API_KEY'].filter((k) => !env(k));
+  return missing.length ? { ok: false, missing } : { ok: true, missing: [] };
+}
+
+// Fail at load, not at first request: a LIVE module with incomplete config
+// should never survive import.
+if (LIVE) {
+  const v = validateConfig();
+  if (!v.ok) throw new Error(`Assistant LIVE misconfigured — missing env: ${v.missing.join(', ')}`);
+}
+
 function env(key) {
   try {
     return (typeof process !== 'undefined' && process.env && process.env[key]) || '';
@@ -47,6 +65,8 @@ function env(key) {
  */
 export async function respond({ request, part, mode }) {
   if (LIVE) {
+    const v = validateConfig();
+    if (!v.ok) throw new Error(`Assistant LIVE misconfigured — missing env: ${v.missing.join(', ')}`);
     // return await callBoundedAssistant({ request, part, mode }, ASSISTANT_CONFIG);
     throw new Error('LIVE assistant not configured. Set ASSISTANT_CONFIG and flip LIVE.');
   }
