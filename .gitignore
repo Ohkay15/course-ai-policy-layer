@@ -1,0 +1,11 @@
+# Secrets and local config — never committed (audit L2)
+.env
+.env.*
+
+# Dependencies and tooling
+node_modules/
+.obvious/
+
+# Logs and OS noise
+*.log
+.DS_Store
