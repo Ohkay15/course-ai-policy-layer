@@ -125,3 +125,22 @@ export function evaluate(rule, intent) {
       return { decision: DECISION.BLOCK, reason: 'No rule set for this part; assistance withheld pending instructor policy.' };
   }
 }
+
+/**
+ * The brief mode the assistant is given for a request, derived from the
+ * classified intent and the part's rule. Pure function, extracted from the
+ * engine so the rule × intent mapping is testable without a browser.
+ *
+ * Concept and review intents keep their scoped briefs on any part. Anything
+ * else takes the part's floor: a reasoning-only part must never brief the
+ * model as unscoped 'assist', even when the classifier can't name the intent.
+ *
+ * @param {string} intent one of INTENT
+ * @param {string} rule   one of RULE
+ * @returns {string} 'concept' | 'review' | 'assist'
+ */
+export function briefMode(intent, rule) {
+  if (intent === INTENT.CONCEPT) return 'concept';
+  if (intent === INTENT.REVIEW) return 'review';
+  return rule === RULE.LOGIC_ONLY ? 'concept' : 'assist';
+}
