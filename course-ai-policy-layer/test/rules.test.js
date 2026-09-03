@@ -62,5 +62,49 @@ for (const [rule, intent, want] of BRIEF_GRID) {
   check(`brief: ${rule} x ${intent}`, briefMode(intent, rule), want);
 }
 
+// --- edge-input contract (hardening spec §1): coercion, never a crash ---
+// Any input classifies without throwing; empty/whitespace is OTHER.
+const EDGE_INPUTS = [
+  // [input, expected intent]
+  ['', INTENT.OTHER],
+  ['   ', INTENT.OTHER],
+  [null, INTENT.OTHER],
+  [undefined, INTENT.OTHER],
+  [42, INTENT.OTHER],   // coerced, not a trim crash
+  [{}, INTENT.OTHER],   // coerced, not a trim crash
+];
+for (const [input, want] of EDGE_INPUTS) {
+  check(`edge input: ${String(input)} classifies without throwing`, classifyIntent(input), want);
+}
+
+// --- utterance contract (hardening spec §2): fixes and pins ---
+// The pinned table is the classifier's contract: a negated produce clause
+// ("don't write it for me") must not classify PRODUCE, while an unconditional
+// produce clause keeps classifying PRODUCE even in a mixed request.
+const UTTERANCES = [
+  // [utterance, expected intent, note]
+  ["don't write it for me — explain the approach", INTENT.CONCEPT,
+    'fix: negated produce clause, concept requested'],
+  ['no need to write the code, walk me through the approach', INTENT.CONCEPT,
+    'fix: negated produce clause, walkthrough requested'],
+  ["I'm stuck — please write the function for me", INTENT.PRODUCE,
+    'pin: unconditional produce clause'],
+  ['why is my function failing?', INTENT.REVIEW,
+    'pin: debugging question about own work'],
+  ['explain the difference between bias and variance', INTENT.CONCEPT,
+    'pin: concept question'],
+  ['check my summary and fix it for me', INTENT.PRODUCE,
+    'pin: mixed request, unconditional produce clause wins (fail-closed to the stricter rule)'],
+  ["please don't write it for me", INTENT.OTHER,
+    'drift guard: negated clause to end of input is not a produce request'],
+  ['never write my essay. explain photosynthesis instead', INTENT.CONCEPT,
+    'drift guard: negation stops at sentence punctuation; concept matches original'],
+  ["don't fix it for me, just check my summary", INTENT.REVIEW,
+    'drift guard: REVIEW still matches the original text'],
+];
+for (const [utterance, want, note] of UTTERANCES) {
+  check(`utterance: ${note}`, classifyIntent(utterance), want);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

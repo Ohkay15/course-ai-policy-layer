@@ -58,13 +58,18 @@ const REVIEW_PATTERNS = [
 ];
 
 export function classifyIntent(text) {
-  const t = (text || '').trim();
+  const t = String(text ?? '').trim(); // non-string no longer throws
   if (!t) return INTENT.OTHER;
   // Order matters. Producing the artifact is what rules most often gate, so
   // check it first. Review is checked before concept because debugging
   // questions ("why is this failing") often open like concept questions
   // ("why does...") but are really about the student's own work.
-  if (PRODUCE_PATTERNS.some((re) => re.test(t))) return INTENT.PRODUCE;
+  // "don't write it for me" is NOT a produce request: drop negated clauses
+  // (cue through the following clause, up to punctuation) before the PRODUCE
+  // match only — REVIEW/CONCEPT still match the original text. The utterance
+  // table in test/rules.test.js pins this contract.
+  const probe = t.replace(/\b(don'?t|do not|never|no need to)\b[^,.!?;]*/gi, ' ');
+  if (PRODUCE_PATTERNS.some((re) => re.test(probe))) return INTENT.PRODUCE;
   if (REVIEW_PATTERNS.some((re) => re.test(t))) return INTENT.REVIEW;
   if (CONCEPT_PATTERNS.some((re) => re.test(t))) return INTENT.CONCEPT;
   return INTENT.OTHER;

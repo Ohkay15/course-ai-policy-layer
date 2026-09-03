@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "python3 -m http.server 8000 --bind 127.0.0.1",
-    "test": "node test/rules.test.js && node test/assistant-config.test.js && node test/canvas-config.test.js"
+    "test": "node test/rules.test.js && node test/engine.test.js && node test/assistant-config.test.js && node test/canvas-config.test.js"
   },
   "keywords": ["education", "ai-policy", "lti", "canvas", "academic-integrity", "human-oversight"],
   "license": "MIT"
