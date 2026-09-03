@@ -13,7 +13,7 @@
  * by the policy and the record, not by hoping the model refuses.
  */
 
-import { classifyIntent, evaluate, DECISION, RULE } from './policy/rules.js';
+import { classifyIntent, evaluate, briefMode, DECISION, RULE } from './policy/rules.js';
 import { respond as assistantRespond } from './integrations/assistant.js';
 import { postInteractionRecord } from './integrations/canvas.js';
 
@@ -61,7 +61,7 @@ export class Engine {
       reply = r.text;
     } else if (decision === DECISION.ALLOW || decision === DECISION.ALLOW_FLAGGED) {
       verdict = decision === DECISION.ALLOW_FLAGGED ? 'Allowed (flagged)' : 'Allowed';
-      mode = intent === 'CONCEPT' ? 'concept' : intent === 'REVIEW' ? 'review' : 'assist';
+      mode = briefMode(intent, part.rule);
       const r = await assistantRespond({ request, part, mode });
       reply = r.text;
     }
