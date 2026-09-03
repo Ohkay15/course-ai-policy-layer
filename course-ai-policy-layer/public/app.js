@@ -58,6 +58,7 @@ function addBubble(cls, html) {
   b.innerHTML = html;
   c.appendChild(b);
   c.scrollTop = c.scrollHeight;
+  return b;
 }
 
 function renderChat(reset) {
@@ -85,20 +86,23 @@ async function send(text) {
   const { outcome, reply } = await engine.handle(activePart, text);
 
   if (outcome === 'gate') {
-    // student must justify to proceed
-    addBubble('gate',
+    // A new gate supersedes any older one: strip older gates' action buttons
+    // so a stale button can never arm a justification for this newer request.
+    el('chat').querySelectorAll('.gate-actions').forEach((n) => n.remove());
+    // student must justify to proceed — buttons live on THIS bubble
+    const gateBubble = addBubble('gate',
       esc(reply) +
       `<div class="gate-actions">
-        <button id="justifyBtn">Proceed and record why</button>
-        <button id="backoffBtn" class="ghost">I'll do it myself</button>
+        <button data-action="justify">Proceed and record why</button>
+        <button data-action="backoff" class="ghost">I'll do it myself</button>
       </div>`);
-    el('justifyBtn').onclick = () => {
+    gateBubble.querySelector('[data-action="justify"]').onclick = () => {
       pendingJustification = text;
       el('input').placeholder = 'Why did you need AI on this part? (goes in the record)';
       el('input').focus();
       addBubble('sys', 'Type your reason below. It will be recorded for your instructor.');
     };
-    el('backoffBtn').onclick = () => {
+    gateBubble.querySelector('[data-action="backoff"]').onclick = () => {
       // Backing off disarms the gate: the next message is a fresh request,
       // never a justification. Without this, the armed request survives and
       // the next message is recorded 'Exceeded (justified)'.
