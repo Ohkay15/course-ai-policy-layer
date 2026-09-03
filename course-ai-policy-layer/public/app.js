@@ -5,6 +5,7 @@ import { Engine } from '../src/engine.js';
 const engine = new Engine();
 let activePart = ASSIGNMENT.parts[0];
 let pendingJustification = null; // holds the request awaiting a justification
+let sending = false; // in-flight guard: only one engine.handle at a time
 
 const RULE_META = {
   [RULE.ALLOWED]:            { label: 'AI allowed',        cls: 'open',   band: 'AI is a tool here. Everything is recorded.' },
@@ -14,7 +15,9 @@ const RULE_META = {
 };
 
 const el = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+// Single quotes are escaped too (audit low L1): an unescaped ' inside an
+// attribute delimited by single quotes is an XSS sink.
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
 function renderAssignmentHeader() {
   el('asgCourse').textContent = ASSIGNMENT.course;
@@ -69,7 +72,11 @@ function renderChat(reset) {
 }
 
 async function send(text) {
-  if (!text.trim()) return;
+  // Refuse a second send while one is in flight: two rapid Enters (or a
+  // double-click) must never interleave engine.handle calls.
+  if (sending || !text.trim()) return;
+  sending = true;
+  el('sendBtn').disabled = true;
   addBubble('me', esc(text));
 
   // A failure anywhere in the send path (assistant, Canvas sync) must not
@@ -80,9 +87,12 @@ async function send(text) {
     // If we're mid-justification, this message IS the justification.
     if (pendingJustification) {
       const req = pendingJustification;
+      // Recovery invariant: the armed justification is cleared only after
+      // engine.handle resolves. Clearing it before the await lost the gate
+      // state whenever the send failed mid-justification.
+      const { reply } = await engine.handle(activePart, req, text);
       pendingJustification = null;
       el('input').placeholder = 'Ask the course assistant…';
-      const { reply } = await engine.handle(activePart, req, text);
       addBubble('ai flagged', esc(reply) + `<div class="flag">Recorded as: exceeded bound, justified.</div>`);
       renderRecord();
       return;
@@ -124,8 +134,21 @@ async function send(text) {
     renderRecord();
   } catch (err) {
     console.error(err); // surfaced in the UI below; logged for debugging
-    addBubble('sys', 'Something went wrong. Your request may not have been completed — check the record panel.');
+    if (pendingJustification) {
+      // Failure mid-justification: the armed request survived (recovery
+      // invariant above), so stay in justification mode and say so.
+      el('input').placeholder = 'Why did you need AI on this part? (goes in the record)';
+      addBubble('sys', 'Something went wrong — your justification was kept. Send it again.');
+    } else {
+      addBubble('sys', 'Something went wrong. Your request may not have been completed — check the record panel.');
+    }
     renderRecord();
+  } finally {
+    // Release the guard on every path; refocus the input so a refused or
+    // failed send never strands the keyboard.
+    sending = false;
+    el('sendBtn').disabled = false;
+    el('input').focus();
   }
 }
 
@@ -137,7 +160,10 @@ function renderRecord() {
     body.innerHTML = `<div class="rec-empty">Nothing logged yet. Ask the assistant something above.</div>`;
     return;
   }
+  // A null/undefined verdict renders an em dash, never the string 'null'.
+  const verdictText = (v) => (v == null ? '—' : String(v));
   const verdictCls = (v) =>
+    v == null ? '' :
     /Blocked/.test(v) ? 'blocked' :
     /Exceeded/.test(v) ? 'exceeded' :
     /flagged/i.test(v) ? 'flagged' : 'allowed';
@@ -149,21 +175,37 @@ function renderRecord() {
         <th>Request</th><th style="width:140px">Outcome</th><th>Note</th>
       </tr></thead>
       <tbody>
-        ${rec.map((e) => `
+        ${rec.map((e) => {
+          const v = verdictText(e.verdict);
+          const cls = verdictCls(e.verdict);
+          // The engine marks an entry synced:false when the Canvas write fails;
+          // surface it to the instructor instead of showing a clean record.
+          const sync = e.synced === false ? '<div class="sync-warn">not synced</div>' : '';
+          return `
           <tr>
             <td class="t-time">${new Date(e.time).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}</td>
             <td>${esc(e.partTitle)}</td>
             <td>${esc(e.request)}${e.justification ? `<div class="just">reason: ${esc(e.justification)}</div>` : ''}</td>
-            <td><span class="verdict ${verdictCls(e.verdict)}">${esc(e.verdict)}</span></td>
+            <td><span class="verdict${cls ? ' ' + cls : ''}">${esc(v)}</span>${sync}</td>
             <td class="rec-note">${esc(e.reason)}</td>
-          </tr>`).join('')}
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>`;
 }
 
 // wire up
-el('sendBtn').onclick = () => { const v = el('input').value; el('input').value=''; send(v); };
-el('input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { const v = el('input').value; el('input').value=''; send(v); } });
+function submit() {
+  // Checked synchronously, before clearing: a send refused by the in-flight
+  // guard keeps its text in the input instead of being dropped silently.
+  if (sending) return;
+  const v = el('input').value;
+  if (!v.trim()) return;
+  el('input').value = '';
+  send(v);
+}
+el('sendBtn').onclick = submit;
+el('input').addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
 
 renderAssignmentHeader();
 renderActivePart();
