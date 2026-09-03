@@ -99,6 +99,11 @@ async function send(text) {
       addBubble('sys', 'Type your reason below. It will be recorded for your instructor.');
     };
     el('backoffBtn').onclick = () => {
+      // Backing off disarms the gate: the next message is a fresh request,
+      // never a justification. Without this, the armed request survives and
+      // the next message is recorded 'Exceeded (justified)'.
+      pendingJustification = null;
+      el('input').placeholder = 'Ask the course assistant…';
       addBubble('sys', 'Good call — this is the part to do yourself. Nothing recorded against you.');
     };
     return;
