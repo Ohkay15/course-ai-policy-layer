@@ -1,0 +1,12 @@
+{
+  "name": "course-ai-policy-layer",
+  "version": "0.1.0",
+  "description": "Instructors scope AI use part-by-part on an assignment; students work inside the scope; every interaction is recorded in the LMS. Modeled on a real UW-Madison course policy.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test": "node test/rules.test.js"
+  },
+  "keywords": ["education", "ai-policy", "lti", "canvas", "academic-integrity", "human-oversight"],
+  "license": "MIT"
+}
